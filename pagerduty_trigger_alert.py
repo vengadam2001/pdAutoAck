@@ -17,9 +17,25 @@ import datetime
 import json
 import pickle as pk
 from pd_cred import pd_user_id, headers
+import sys
+import time
+from datetime import timedelta, datetime
 
 YELLOW_TIME = 15  # after this duration of time in minutes alert moves to yellow state.
 RED_TIME = 60 # after this duration of time in minutes alerts moves to red state.
+GREEN =   "\033[38;2;0;255;150m"
+RED =     "\033[38;2;255;0;0m"
+ORANGE =  "\033[38;2;255;150;0m"     
+END =     "\033[0m"
+
+url = "https://fourkites-inc.pagerduty.com/api/v1/incidents/count?statuses[]=triggered&statuses[]=acknowledged&user_ids[]={}&date_range=all&urgencies[]=high&with_suppressed=true".format(pd_user_id)
+url_incidents = "https://fourkites-inc.pagerduty.com/api/v1/incidents?statuses[]=triggered&user_ids[]={}&date_range=all&urgencies[]=high&with_suppressed=true".format(pd_user_id)
+
+payload = {}
+incident_dict = {}
+
+autoAcknowledge = False
+kill = False 
 
 def print_l(a,endl):
   file = open("pd_logs.txt",mode='a')
@@ -277,31 +293,31 @@ def get_input():
       autoAcknowledge = not(autoAcknowledge)
     elif (inp =='m'):
       print_l("updating...")
+      update()
     elif (inp == 'q'):
       kill =True
       print_l("exiting pls wait.")
       exit(0)
     
-  def update():
-    PASS
-      
+def get_remote_content(file_url):
+    try:
+        return requests.get(file_url).text
+    except Exception as e:
+        print_l(f"Error fetching remote content: {e}")
+        return None
+
+def update():
+    file_url = "https://raw.githubusercontent.com/vengadam2001/pdAutoAck/main/pagerduty_trigger_alert.py"
+
+    if get_remote_content(file_url) is not None and get_remote_content(file_url) != open("pagerduty_trigger_alert.py").read():
+        os.remove("pagerduty_trigger_alert.py")
+        with open("pagerduty_trigger_alert.py", "w") as f:
+            f.write(get_remote_content(file_url))
+        print_l("Updated to latest version.")
+        os.execv(__file__, sys.argv)
+
 if __name__ == "__main__":
-    
-    url = "https://fourkites-inc.pagerduty.com/api/v1/incidents/count?statuses[]=triggered&statuses[]=acknowledged&user_ids[]={}&date_range=all&urgencies[]=high&with_suppressed=true".format(pd_user_id)
-    url_incidents = "https://fourkites-inc.pagerduty.com/api/v1/incidents?statuses[]=triggered&user_ids[]={}&date_range=all&urgencies[]=high&with_suppressed=true".format(pd_user_id)
-    # url_incidents_all = "https://fourkites-inc.pagerduty.com/api/v1/incidents?statuses[]=triggered&statuses[]=triggered&statuses[]=resolved{}&date_range=all&urgencies[]=high&with_suppressed=true".format("")
-    # url_all_incidents_for_user ="https://fourkites-inc.pagerduty.com/api/v1/incidents?statuses[]=triggered&statuses[]=triggered&statuses[]=resolved{}&date_range=all&urgencies[]=high&with_suppressed=true".format("&user_ids[]="+pd_user_id)
-    
-    payload = {}
-    incident_dict = {}
-    
-    autoAcknowledge = False
-    kill = False
-    
-    GREEN =   "\033[38;2;0;255;150m"
-    RED =     "\033[38;2;255;0;0m"
-    ORANGE =  "\033[38;2;255;150;0m"     
-    END =     "\033[0m" 
+    update()
     
     incident_dict = load_dict()
     
