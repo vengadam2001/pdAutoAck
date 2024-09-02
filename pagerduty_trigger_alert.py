@@ -230,7 +230,7 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
     
 def update_incidents_status(once = False):
-    global incident_dict, RED, ORANGE, END, YELLOW_TIME, RED_TIME
+    global incident_dict, RED, ORANGE,GREEN, END, YELLOW_TIME, RED_TIME
     
     YELLOW_TIME_IN_SECS = YELLOW_TIME*60
     RED_TIME_IN_SECS = RED_TIME*60 + YELLOW_TIME*60
