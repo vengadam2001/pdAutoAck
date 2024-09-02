@@ -19,7 +19,6 @@ import pickle as pk
 from pd_cred import pd_user_id, headers
 import sys
 import time
-from datetime import timedelta, datetime
 
 YELLOW_TIME = 15  # after this duration of time in minutes alert moves to yellow state.
 RED_TIME = 60 # after this duration of time in minutes alerts moves to red state.
