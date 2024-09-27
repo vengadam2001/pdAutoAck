@@ -26,6 +26,7 @@ GREEN =   "\033[38;2;0;255;150m"
 RED =     "\033[38;2;255;0;0m"
 ORANGE =  "\033[38;2;255;150;0m"     
 END =     "\033[0m"
+sleep_time = 10
 
 url = "https://fourkites-inc.pagerduty.com/api/v1/incidents/count?statuses[]=triggered&statuses[]=acknowledged&user_ids[]={}&date_range=all&urgencies[]=high&with_suppressed=true".format(pd_user_id)
 url_incidents = "https://fourkites-inc.pagerduty.com/api/v1/incidents?statuses[]=triggered&user_ids[]={}&date_range=all&urgencies[]=high&with_suppressed=true".format(pd_user_id)
@@ -72,7 +73,7 @@ def get_time_difference(ist_time):
 #     url = "https://fourkites-inc.pagerduty.com/api/v1/incidents"
 #     payload = {"requester_id": pd_user_id, "incidents": [{"id": pd_incident_id, "type": "incident_reference", "status": "acknowledged"}for pd_incident_id in pd_incident_ids]}
 #     response = requests.request("PUT", url, headers=headers, json=payload)
-#     print(response.json())
+#     print_l(response.json())
 #     if response.status_code != 200:
 #           print_l(f"FAILED to auto acknowledge for incident id: {pd_incident_ids}")
 #           return 
@@ -109,7 +110,8 @@ def get_acknowledged_incidents():
           incident_dict[pd_incident_id]["status"] = "acknowledged"
           incident_dict[pd_incident_id]["created_at"] = get_time_in_str(convert_time_to_ist(created_at))
   else:
-    print(f"failed to get acknowledged incidents.") 
+   
+    print_l(f"failed to get acknowledged incidents.") 
      
         
 def update_incidents():
@@ -160,28 +162,62 @@ def update_incidents():
     save_dict()
   except Exception as e:
     print_l(e)
-    time.sleep(5)
-  time.sleep(10)
-  
-def acknowledge_incident(pd_incident_id, title, created_at):
+    time.sleep(sleep_time/2)
+  time.sleep(sleep_time)
+
+def acknowledge_all(response):
   global incident_dict
   url = "https://fourkites-inc.pagerduty.com/api/v1/incidents"
-  payload = {"requester_id": pd_user_id, "incidents": [{"id": pd_incident_id, "type": "incident_reference", "status": "acknowledged"}]}
-  response = requests.request("PUT", url, headers=headers, json=payload)
-  print(response.json())
+  payload= {}
+  status = "triggered"
+  arr = []
+  play_sound = False
+  if autoAcknowledge:
+    for i in response.json()["incidents"]:
+      if i["id"] not in incident_dict:
+        play_sound = True
+      # acknowledge_incident(i["id"], i["title"], i["created_at"], autoAcknowledge)
+      arr.append({"id": i["id"], "type": "incident_reference", "status": "acknowledged"})
+    payload = {"requester_id": pd_user_id, "incidents": [arr]}
+    print_l(payload)
+    response = requests.request("PUT", url, headers=headers, json=payload)
+    status = "acknowledged"
+    print_l(response.json())
+    
+  
+def acknowledge_incident(pd_incident_id, title, created_at, autoAcknowledge):
+  global incident_dict
+  url = "https://fourkites-inc.pagerduty.com/api/v1/incidents"
+  
+  payload= {}
+  response = None
+  status = "triggered"
+  if autoAcknowledge:
+    payload = {"requester_id": pd_user_id, "incidents": [{"id": pd_incident_id, "type": "incident_reference", "status": "acknowledged"}]}
+    response = requests.request("PUT", url, headers=headers, json=payload)
+    status = "acknowledged"
+    print_l(response.json())
+  else:
+    response = requests.request("GET", url+"/"+pd_incident_id, headers=headers, json=payload)
+    print_l(response.json())
+    
   if response.status_code != 200:
         print_l(f"FAILED to auto acknowledge for incident id: {pd_incident_id}")
         return 
-  if pd_incident_id in incident_dict:
-      incident_dict[pd_incident_id]["count"] += 1
+  
+  if pd_incident_id in incident_dict and incident_dict[pd_incident_id]["status"] == "acknowledged" or status == "acknowledged" :
+      incident_dict[pd_incident_id]["count"] += 1 
       incident_dict[pd_incident_id]["status"] = "Re-acknowledged"
   else:
       incident_dict[pd_incident_id] = {}
       incident_dict[pd_incident_id]["title"] = title
       incident_dict[pd_incident_id]["url"] = "https://fourkites-inc.pagerduty.com/incidents/" + pd_incident_id
-      incident_dict[pd_incident_id]["count"] = 1
-      incident_dict[pd_incident_id]["status"] = "acknowledged"
+      incident_dict[pd_incident_id]["status"] = status
       incident_dict[pd_incident_id]["created_at"] = get_time_in_str(convert_time_to_ist(created_at))
+      if "count" in incident_dict[pd_incident_id]:
+        incident_dict[pd_incident_id]["count"] += 1
+      else:
+        incident_dict[pd_incident_id]["count"] = 1
   save_dict()
 
 def display():
@@ -202,16 +238,26 @@ def display():
     time.sleep(1)
 
 def get_and_acknowledge_incidents():
-    while not kill and autoAcknowledge:
-        response = requests.request("GET", url, headers=headers, data=payload)
-        if response.json()["triggered"] > 0:
-            res = requests.request("GET", url_incidents, headers=headers, data=payload)
-            for i in res.json()["incidents"]:
-              acknowledge_incident(i["id"], i["title"], i["created_at"])
-            # acknowledge_incident([i["id"] for i in res.json()["incidents"]], [i["title"] for i in res.json()["incidents"]], [i["created_at"] for i in res.json()["incidents"]])
-            # update_incidents()
-            playsound.playsound("sound.mp3", True)
-        time.sleep(10)
+    global incident_dict
+    while not kill:
+      play_sound = False
+      try:
+          response = requests.request("GET", url, headers=headers, data=payload)
+          if response.json()["triggered"] > 0:
+              res = requests.request("GET", url_incidents, headers=headers, data=payload)
+              # acknowledge_all(res)
+              for i in res.json()["incidents"]:
+                if i["id"] in incident_dict:
+                  play_sound = True
+                acknowledge_incident(i["id"], i["title"], i["created_at"], autoAcknowledge)
+              if play_sound == True:
+                playsound.playsound("sound.mp3", True)
+              # acknowledge_incident([i["id"] for i in res.json()["incidents"]], [i["title"] for i in res.json()["incidents"]], [i["created_at"] for i in res.json()["incidents"]])
+              # update_incidents()
+      except Exception as e :
+          print_l(e)
+          print_l(e)
+      time.sleep(sleep_time)
 
 def save_dict():
   global incident_dict
@@ -222,8 +268,9 @@ def load_dict():
     pass
     return pk.load(open("./incident_dict", mode ="rb"))
   except Exception as e:
-    print_l(("Error",e))
-    print_l(("program will continue. dont worry..."))
+    print_l("Error")
+    print_l(e)
+    print_l("program will continue. dont worry...")
   return {}
 
 def clear_screen():
@@ -272,10 +319,10 @@ def update_incidents_status(once = False):
         save_dict()
       except Exception as e:
         print_l(e)
-        time.sleep(5)
+        time.sleep(sleep_time/2)
       if once==True:
         return
-      time.sleep(10)
+      time.sleep(sleep_time)
       
 def excecute_job_forr_alert(incident_id):
   # get alert service name.
@@ -306,17 +353,17 @@ def get_remote_content(file_url):
         return None
 
 def update():
-    file_url = "https://raw.githubusercontent.com/vengadam2001/pdAutoAck/main/pagerduty_trigger_alert.py"
+    # file_url = "https://raw.githubusercontent.com/vengadam2001/pdAutoAck/main/pagerduty_trigger_alert.py"
 
-    if get_remote_content(file_url) is not None and get_remote_content(file_url) != open("pagerduty_trigger_alert.py").read():
-        os.remove("pagerduty_trigger_alert.py")
-        with open("pagerduty_trigger_alert.py", "w") as f:
-            f.write(get_remote_content(file_url))
-        print_l("Updated to latest version.")
+    # if get_remote_content(file_url) is not None and get_remote_content(file_url) != open("pagerduty_trigger_alert.py").read():
+    #     os.remove("pagerduty_trigger_alert.py")
+    #     with open("pagerduty_trigger_alert.py", "w") as f:
+    #         f.write(get_remote_content(file_url))
+    #     print_l("Updated to latest version.")
         os.execv(__file__, sys.argv)
 
 if __name__ == "__main__":
-    update()
+    #update()
     
     incident_dict = load_dict()
     
@@ -335,3 +382,4 @@ if __name__ == "__main__":
     print_l("exited properly")
 
 #change the color of the alert when a incident is not resolved for more than 30 mins.
+
