@@ -353,13 +353,13 @@ def get_remote_content(file_url):
         return None
 
 def update():
-    # file_url = "https://raw.githubusercontent.com/vengadam2001/pdAutoAck/main/pagerduty_trigger_alert.py"
+    file_url = "https://raw.githubusercontent.com/vengadam2001/pdAutoAck/main/pagerduty_trigger_alert.py"
 
-    # if get_remote_content(file_url) is not None and get_remote_content(file_url) != open("pagerduty_trigger_alert.py").read():
-    #     os.remove("pagerduty_trigger_alert.py")
-    #     with open("pagerduty_trigger_alert.py", "w") as f:
-    #         f.write(get_remote_content(file_url))
-    #     print_l("Updated to latest version.")
+    if get_remote_content(file_url) is not None and get_remote_content(file_url) != open("pagerduty_trigger_alert.py").read():
+        os.remove("pagerduty_trigger_alert.py")
+        with open("pagerduty_trigger_alert.py", "w") as f:
+            f.write(get_remote_content(file_url))
+        print_l("Updated to latest version.")
         os.execv(__file__, sys.argv)
 
 if __name__ == "__main__":
@@ -382,4 +382,3 @@ if __name__ == "__main__":
     print_l("exited properly")
 
 #change the color of the alert when a incident is not resolved for more than 30 mins.
-
